@@ -164,7 +164,8 @@ Langgraph/
 │   ├── ARCHITECTURE.md               # Beginner's guide to LLMs, LangGraph & Agents
 │   ├── SETUP.md                      # Windows PowerShell step-by-step setup
 │   ├── API.md                        # Full REST API & SSE protocol specification
-│   └── DEPLOYMENT.md                 # Docker Compose & production deployment
+│   ├── DEPLOYMENT.md                 # Docker Compose & production deployment
+│   └── RENDER_DEPLOYMENT.md          # Render static site, API, and PostgreSQL setup
 ├── docker-compose.yml                # Multi-container deployment configuration
 ├── .env.example                      # Safe environment template
 ├── .gitignore

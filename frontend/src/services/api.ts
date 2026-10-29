@@ -8,7 +8,10 @@ import {
   ResearchDepth
 } from '../types';
 
-const API_BASE = '/api/v1';
+const configuredApiUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/+$/, '');
+const API_BASE = configuredApiUrl
+  ? `${/^https?:\/\//i.test(configuredApiUrl) ? configuredApiUrl : `https://${configuredApiUrl}`}/api/v1`
+  : '/api/v1';
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {

@@ -33,8 +33,12 @@ app = FastAPI(
 )
 
 # CORS configuration
+frontend_origin = settings.FRONTEND_ORIGIN.rstrip("/")
+if frontend_origin and not frontend_origin.startswith(("http://", "https://")):
+    frontend_origin = f"https://{frontend_origin}"
+
 origins = [
-    settings.FRONTEND_ORIGIN,
+    frontend_origin,
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:3000",
