@@ -10,7 +10,7 @@ if settings.resolved_database_url.startswith("sqlite"):
 engine = create_engine(
     settings.resolved_database_url,
     connect_args=connect_args,
-    echo=settings.DEBUG,
+    echo=False,
     pool_pre_ping=True
 )
 

@@ -25,6 +25,7 @@ class ResearchService:
         # Launch background task if an event loop is running
         try:
             loop = asyncio.get_running_loop()
+            logger.info(f"Event loop found: {loop}. Creating background task for session {session.id}")
             task = loop.create_task(
                 run_research_workflow(
                     session_id=session.id,
@@ -36,8 +37,8 @@ class ResearchService:
             )
             active_research_tasks[session.id] = task
             logger.info(f"Launched background research job {session.id} for topic: {request.topic}")
-        except RuntimeError:
-            logger.debug("No active running event loop to schedule background task immediately.")
+        except RuntimeError as e:
+            logger.error(f"FAILED to get event loop for session {session.id}: {e}", exc_info=True)
 
         return session
 

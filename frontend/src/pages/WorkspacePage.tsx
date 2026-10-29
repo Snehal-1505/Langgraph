@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ResearchForm } from '../components/ResearchForm';
 import { ProgressTracker } from '../components/ProgressTracker';
@@ -27,6 +27,7 @@ export const WorkspacePage: React.FC = () => {
   const [errorNotice, setErrorNotice] = useState<string | null>(null);
 
   const eventSourceRef = useRef<EventSource | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Load existing session if passed via query params
   useEffect(() => {
@@ -56,9 +57,10 @@ export const WorkspacePage: React.FC = () => {
         } catch (e) {
           console.warn('Sources not available yet', e);
         }
-      } else if (sess.status === 'running') {
+      } else if (sess.status === 'running' || sess.status === 'pending') {
         setActiveTab('progress');
         connectSSE(id);
+        startPolling(id);
       }
     } catch (err: any) {
       setErrorNotice(err.message || 'Failed to load session');
@@ -85,12 +87,66 @@ export const WorkspacePage: React.FC = () => {
       setSearchParams({ session: newSession.id });
       setActiveTab('progress');
       connectSSE(newSession.id);
+      startPolling(newSession.id);
     } catch (err: any) {
       setErrorNotice(err.message || 'Failed to initiate research session');
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Helper: fetch report + sources when a session is completed
+  const fetchCompletedData = useCallback(async (sessionId: string) => {
+    try {
+      const rep = await api.getReport(sessionId);
+      setReport(rep);
+      setActiveTab('report');
+    } catch (err) {
+      console.warn('Could not fetch report', err);
+    }
+    try {
+      const srcs = await api.getSources(sessionId);
+      setSources(srcs);
+    } catch (err) {
+      console.warn('Could not fetch sources', err);
+    }
+  }, []);
+
+  // Polling fallback: check session status every 2 seconds
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  const startPolling = useCallback((sessionId: string) => {
+    stopPolling();
+    pollingRef.current = setInterval(async () => {
+      try {
+        const sess = await api.getSession(sessionId);
+        if (sess.status === 'completed') {
+          stopPolling();
+          setSession(sess);
+          await fetchCompletedData(sessionId);
+          if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+          }
+        } else if (sess.status === 'failed' || sess.status === 'cancelled') {
+          stopPolling();
+          setSession(sess);
+          if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+          }
+        } else {
+          // Update current_stage for progress display
+          setSession(prev => prev ? { ...prev, current_stage: sess.current_stage, status: sess.status } : prev);
+        }
+      } catch (err) {
+        console.warn('Polling error:', err);
+      }
+    }, 2000);
+  }, [stopPolling, fetchCompletedData]);
 
   const connectSSE = (sessionId: string) => {
     if (eventSourceRef.current) {
@@ -119,6 +175,7 @@ export const WorkspacePage: React.FC = () => {
 
         // If completed or failed, fetch final report and sources
         if (evData.event_type === 'completed' || evData.stage === 'completed') {
+          stopPolling();
           setTimeout(async () => {
             try {
               const rep = await api.getReport(sessionId);
@@ -162,6 +219,7 @@ export const WorkspacePage: React.FC = () => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
     }
+    stopPolling();
     setSession(null);
     setEvents([]);
     setReport(null);
@@ -176,8 +234,9 @@ export const WorkspacePage: React.FC = () => {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
       }
+      stopPolling();
     };
-  }, []);
+  }, [stopPolling]);
 
   return (
     <div className="space-y-6">
